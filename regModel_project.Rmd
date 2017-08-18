@@ -2,6 +2,7 @@
 title: "Regression Models Course Project"
 author: "Alicia Rodriguez"
 output: pdf_document
+keep_md: true
 ---
 
 ```{r setup, include=FALSE}
