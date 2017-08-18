@@ -1,0 +1,234 @@
+---
+title: "Regression Models Course Project"
+author: "Alicia Rodriguez"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+data(cars) #load data set
+library(car) #for vif function
+```
+
+## Executive Summary
+
+This report explores the relationship between a set of variables related to cars and miles per gallon (MPG). More precisely, the focus is on the following questions:
+
+* Is an automatic or manual transmission (represented by the variable $am$) better for MPG?
+
+* Quantify the MPG difference between automatic and manual transmissions.
+
+## Exploratory Analysis
+
+After transforming variables $cyl$, $vs$, $am$, $gear$, and $carb$ to factors (see the data structure in the appendix), and taking a quick look at the relationship of variable MPG with respect to $am$, we could expect that manual transmission ($am=1$) leads to a higher MPG. Let's test this hypothesis and check in which cases holds true.
+```{r data_str, echo=FALSE, fig.height=2.5, fig.width=3, fig.align='center'}
+mtcars$cyl<-factor(mtcars$cyl)
+mtcars$vs<-factor(mtcars$vs)
+mtcars$am<-factor(mtcars$am)
+mtcars$gear<-factor(mtcars$gear)
+mtcars$carb<-factor(mtcars$carb)
+
+plot(mtcars$am,mtcars$mpg, ylab="MPG",xaxt="n")
+axis(1, at=c(1,2), labels=c("Automatic", "Manual")) 
+```
+
+## Modelling MPG 
+
+Let's fit a first model of MPG with all available predictors (see appendix for the specific results of $mpg\sim .$). No significant coefficient is obtained (all p-values>0.05), thus we fail to reject the null hypothesis that any of the transmissions is better than the another one for MPG (and the same applies to the rest of predictors). So let's try different models to see the simplest one (with least predictors involved so as to decrease the standard error) that fits reasonably well $mpg$ (i.e., with low bias), where the coefficients are significant to support our hypothesis.
+```{r overall_fitting, echo=FALSE}
+fit1<-lm(mpg~.,mtcars)
+```
+
+We start by simply fitting by the predictor of interest, $mpg~am$, an also by each of the rest of the available predictors, in order to compare the resulting $R^2$. Although $R^2$ is not a perfect measurement of how good the fit is, it can serve as a first approximation on which predictors provide more information so as to predict $mpg$.
+```{r fine_fitting, echo=FALSE}
+fit2<-lm(mpg~am,mtcars)
+fit3<-lm(mpg~am+cyl,mtcars)
+fit4<-lm(mpg~am+disp,mtcars)
+fit5<-lm(mpg~am+hp,mtcars)
+fit6<-lm(mpg~am+drat,mtcars)
+fit7<-lm(mpg~am+wt,mtcars)
+fit8<-lm(mpg~am+qsec,mtcars)
+fit9<-lm(mpg~am+vs,mtcars)
+fit10<-lm(mpg~am+gear,mtcars)
+fit11<-lm(mpg~am+carb,mtcars)
+rsquared<-data.frame(#round(summary(fit1)$r.squared,3),
+            round(summary(fit2)$r.squared,3),
+            round(summary(fit3)$r.squared,3),
+            round(summary(fit4)$r.squared,3),
+            round(summary(fit5)$r.squared,3),
+            round(summary(fit6)$r.squared,3),
+            round(summary(fit7)$r.squared,3),
+            round(summary(fit8)$r.squared,3),
+            round(summary(fit9)$r.squared,3),
+            round(summary(fit10)$r.squared,3),
+            round(summary(fit11)$r.squared,3))
+rsquarednames<-c("am", "am+cyl", "am+disp", "am+hp", "am+drat", "am+wt", "am+qsec", "am+vs", "am+gear", "am+carb")
+#rbind(rsquarednames,rsquared)
+colnames(rsquared)<-rsquarednames
+rownames(rsquared)<-"R^2"
+rsquared
+```
+
+From the table we see that the variables that provide a higher $R^2$ are $hp$, $cyl$, $wt$, $disp$ and $carb$, in that order. So, let's fit models adding each of these predictors at a time, and comparing the resulting models.
+```{r nested_fit_models, echo=FALSE}
+fit12<-lm(mpg~am+I(hp-mean(hp)),mtcars)
+fit13<-lm(mpg~am+I(hp-mean(hp))+cyl,mtcars)
+fit14<-lm(mpg~am+I(hp-mean(hp))+cyl+I(wt-mean(wt)),mtcars)
+fit15<-lm(mpg~am+I(hp-mean(hp))+cyl+I(wt-mean(wt))+I(disp-mean(disp)),mtcars)
+fit16<-lm(mpg~am+I(hp-mean(hp))+cyl+I(wt-mean(wt))+I(disp-mean(disp))+carb,mtcars)
+```
+
+Taking a look at the results (see appendix for the results of the anova comparison), we are going to consider the predictors $hp$, $cyl$, and $wt$, besides $am$, since the new added variable at each model provides significant results (p-values<0.05). Let's analyze what happens more in detail with the inclusion of each one (centered at their mean for the cases of $hp$ and $wt$ so that the interpretation is more intuitive):
+```{r analyzing_each_model, echo=FALSE}
+tablerownames<-c("Res. Std. Err.", "Adjusted R2", "intercept", "coeff. am", "coeff. hp", "coeff. cyl6", "coeff. cyl8", "coeff. wt", "Pr(>|t|) intercept", "Pr(>|t|) am", "Pr(>|t|) hp", "Pr(>|t|) cyl6", "Pr(>|t|) cyl8", "Pr(>|t|) wt")
+tablecolumnnames<-c("am", "am+hp", "am+hp+cyl", "am+hp+cyl+wt")
+
+RSEs<-c(summary(fit2)$sigma,
+        summary(fit12)$sigma,
+        summary(fit13)$sigma,
+        summary(fit14)$sigma)
+
+AR2<-c(summary(fit2)$adj.r.squared,
+       summary(fit12)$adj.r.squared,
+       summary(fit13)$adj.r.squared,
+       summary(fit14)$adj.r.squared)
+
+intercepts<-c(summary(fit2)$coefficients[1,1],
+              summary(fit12)$coefficients[1,1],
+              summary(fit13)$coefficients[1,1],
+              summary(fit14)$coefficients[1,1])
+
+amcoeffs<-c(summary(fit2)$coefficients[2,1],
+            summary(fit12)$coefficients[2,1],
+            summary(fit13)$coefficients[2,1],
+            summary(fit14)$coefficients[2,1])
+
+hpcoeffs<-c("-",
+            round(summary(fit12)$coefficients[3,1],4),
+            round(summary(fit13)$coefficients[3,1],4),
+            round(summary(fit14)$coefficients[3,1],4))
+
+cyl6coeffs<-c("-",
+            "-",
+            round(summary(fit13)$coefficients[4,1],4),
+            round(summary(fit14)$coefficients[4,1],4))
+
+cyl8coeffs<-c("-",
+            "-",
+            round(summary(fit13)$coefficients[5,1],4),
+            round(summary(fit14)$coefficients[5,1],4))
+
+wtcoeffs<-c("-",
+            "-",
+            "-",
+            round(summary(fit14)$coefficients[6,1],4))
+
+prtintercept<-c(round(summary(fit2)$coefficients[1,4],4),
+                round(summary(fit12)$coefficients[1,4],4),
+                round(summary(fit13)$coefficients[1,4],4),
+                round(summary(fit14)$coefficients[1,4],4))
+
+prtam<-c(round(summary(fit2)$coefficients[2,4],4),
+                round(summary(fit12)$coefficients[2,4],4),
+                round(summary(fit13)$coefficients[2,4],4),
+                round(summary(fit14)$coefficients[2,4],4))
+
+prthp<-c("-",
+                round(summary(fit12)$coefficients[3,4],4),
+                round(summary(fit13)$coefficients[3,4],4),
+                round(summary(fit14)$coefficients[3,4],4))
+
+prtcyl6<-c("-",
+           "-",
+                round(summary(fit13)$coefficients[4,4],4),
+                round(summary(fit14)$coefficients[4,4],4))
+
+prtcyl8<-c("-",
+           "-",
+                round(summary(fit13)$coefficients[5,4],4),
+                round(summary(fit14)$coefficients[5,4],4))
+
+prtwt<-c("-",
+         "-",
+         "-",
+                round(summary(fit14)$coefficients[6,4],4))
+
+df<-rbind(round(RSEs,4),
+          round(AR2,4),
+          round(intercepts,4),
+          round(amcoeffs,4),
+          hpcoeffs,
+          cyl6coeffs,cyl8coeffs,wtcoeffs,
+          prtintercept, prtam, prtwt)
+colnames(df)<-tablecolumnnames
+tablerownames<-c("Res. Std. Err.", "Adjusted R2", "intercept", "coeff. am", "coeff. hp", "coeff. cyl6", "coeff. cyl8", "coeff. wt", "Pr(>|t|) intercept", "Pr(>|t|) am", "Pr(>|t|) wt")
+rownames(df)<-tablerownames
+
+df
+```
+
+In the previous table we can observe several things:
+
+* As the number of predictors increases, the residual standard error decreases and the adjusted $R^2$ increases (as theoretically expected).
+
+* Regarding the **intercept, its value changes when a factor predictor** ($cyl$ in our case) is added. With $hp$ and $wt$ the value does not change much because these predictors are centered in their respective mean values.
+
+* Regarding the **$am$ coefficient (i.e., increase in $mpg$ when manual transmission is used, $am=1$)**, we can see that its value decreases as we take into account more predictors. If only the use of manual or automatic transmission is considered ($mpg\sim am$), **using a manual transmission increases $mpg$ an average of 7.2449 miles per galon, being a significant value (p-value<0.05)**. This value decreases when considering also horse power, $hp$, and number of cylinders, $cyl$, being still signficant values. However, **when a more influential predictor is added to the model, such as the vehicle weight, $wt$, the $am$ coefficient is only of 1.8092 miles per galon and it is not a significant value** anymore. 
+
+We can perform a quick test, fitting the model $mpg\sim am+I(wt-mean(wt)))$ (see appendix for the results). We can see that an increase in one lbs in $wt$ has an impact on $mpg$ two orders of magnitude higher than the fact of using manual transmission. Therefore, $am$ is not a significant predictor anymore (p-value=0.988>>0.05), and its coefficient even reverse the sign, which we know makes no sense.
+
+Analyzing the residuals of the model $mpg\sim am+hp+cyl+wt$ (see last plots of the appendix), we can see that there is **no relationship between the residuals and fitted values**, thus suggesting that the model does not miss any important relationship. Besides, **there are some outliers for which the normality of the resiluals do not apply** (the ones in the upper and lower part of the Normal Q-Q plot), which coincide with the ones with higher standardized residuals in the leverage plot. **These points have low leverage in general**, but their errors do not follow normal distributions, thus leading to the slight slopes in the Residuals vs. Fitted and Scale-Location plots towards those points.
+
+## Conclusions
+
+* *Is an automatic or manual transmission better for MPG?* Only considering automatic or manual **transmission as an isolated predictor for MPG**, we reject the null hypothesis that both of them lead to the same MPG with a p-value<0.05, observing that **using a manual transmission leads to a higher (thus, better) MPG**. However, **if other variables with high impact in MPG are considered**, such as the vehicle weight, we fail to reject the null hypothesis that both manual and automatic transmission lead to the same MPG, and we **could not surely determine which transmission is better for MPG**.
+
+* *Quantify the MPG difference between automatic and manual transmissions.* Considering **manual transmission (ignoring the rest of predictors), it provides in average an increase of 7.245 MPG, with an standard error of 1.764** and a p-value=0.000285. However, as said before, **in case of considering other variables with high impact in MPG** such as the vehicle weight, **we do not observe an increase in MPG anymore, but a slight decrease of 0.02 MPG**. But, again, in presence of weight as predictor, we fail to reject the null hypothesis that automatic and manual transmissions really lead to different MPGs, as the rest of variables has a deeper impact on MPG.
+
+## Appendix
+
+### Exploratory Analysis
+Data structure:
+```{r data_structure, echo=FALSE}
+str(mtcars)
+```
+
+Let's quickly explore the correlations between each pair of variables. For the plot we can see that almost every variable when plotted against $mpg$ shows a negative slope, except for $vs$ and $am$. 
+```{r playing_part}
+pairs(mtcars,panel=panel.smooth,col=3+(mtcars$am==1))
+```
+
+### Modelling MPG
+We can expect to see these negative correlations in the overall regression:
+```{r summary_fit1, echo=FALSE}
+summary(fit1)
+```
+
+Results of comparing different models adding one variable each time:
+```{r comparison_models, echo=FALSE}
+anova(fit2,fit12,fit13,fit14,fit15,fit16)
+```
+
+```{r complete_table, echo=FALSE}
+tablerownames<-c("Res. Std. Err.", "Adjusted R2", "intercept", "coeff. am", "coeff. hp", "coeff. cyl6", "coeff. cyl8", "coeff. wt", "Pr(>|t|) intercept", "Pr(>|t|) am", "Pr(>|t|) hp", "Pr(>|t|) cyl6", "Pr(>|t|) cyl8", "Pr(>|t|) wt")
+df<-rbind(round(RSEs,4),
+          round(AR2,4),
+          round(intercepts,4),
+          round(amcoeffs,4),
+          hpcoeffs,
+          cyl6coeffs,cyl8coeffs,wtcoeffs,
+          prtintercept, prtam, prthp, prtcyl6, prtcyl8, prtwt)
+colnames(df)<-tablecolumnnames
+rownames(df)<-tablerownames
+```
+
+Modelling $mpg$ as the a combination of $am$ and a relevant predictor as $wt$. Notice the sign of $am$ coefficient is reversed.
+```{r am_wt_model, echo=FALSE}
+summary(lm(mpg~am+I(wt-mean(wt)),mtcars))
+```
+
+Residual plots for the model $mpg\sim am+hp+cyl+wt$.
+```{r residual_plots, echo=FALSE, fig.width=8, fig.height=6, fig.align='center'}
+par(mfrow=c(2,2))
+plot(fit14)
+```
